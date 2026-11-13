@@ -1,0 +1,43 @@
+name: build-apk
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: unzip project
+        run: unzip -q pubg_esp_android.zip -d src
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: export yolo model
+        run: |
+          pip install -q ultralytics onnx onnxslim
+          yolo export model=yolov8n.pt format=onnx imgsz=288,640 simplify=True opset=12
+          mkdir -p src/pubg_esp_android/app/src/main/assets
+          cp yolov8n.onnx src/pubg_esp_android/app/src/main/assets/model.onnx
+          ls -lh src/pubg_esp_android/app/src/main/assets/
+
+      - uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.7'
+
+      - name: assemble debug apk
+        working-directory: src/pubg_esp_android
+        run: gradle assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fish-esp-debug
+          path: src/pubg_esp_android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
